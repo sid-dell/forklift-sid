@@ -15,9 +15,8 @@ import (
 )
 
 const (
-	vibName                = "vmkfstools-wrapper"
-	VIBLastCheckAnnotation = "forklift.konveyor.io/vib-last-check"
-	VIBCacheDuration       = 15 * time.Minute
+	vibName          = "vmkfstools-wrapper"
+	VIBCacheDuration = 15 * time.Minute
 )
 
 // VibVersion is set by ldflags
@@ -217,17 +216,10 @@ func installVib(ctx context.Context, client vmware.Client, esx *object.HostSyste
 }
 
 // ShouldSkipVIBCheck checks if VIB validation should be skipped based on cache duration
-func ShouldSkipVIBCheck(annotations map[string]string) bool {
-	if annotations == nil {
+// Returns true if the condition was last updated less than VIBCacheDuration ago
+func ShouldSkipVIBCheck(lastTransitionTime time.Time) bool {
+	if lastTransitionTime.IsZero() {
 		return false
 	}
-	timestamp, ok := annotations[VIBLastCheckAnnotation]
-	if !ok {
-		return false
-	}
-	lastCheckTime, err := time.Parse(time.RFC3339, timestamp)
-	if err != nil {
-		return false
-	}
-	return time.Since(lastCheckTime) < VIBCacheDuration
+	return time.Since(lastTransitionTime) < VIBCacheDuration
 }

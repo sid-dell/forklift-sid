@@ -50,9 +50,9 @@ const (
 
 // CSI driver names
 const (
-	SMBCSIDriverName 		= "smb.csi.k8s.io"
-	VIBReady                = "VIBReady"
-	VIBNotReady             = "VIBNotReady"
+	SMBCSIDriverName = "smb.csi.k8s.io"
+	VIBReady         = "VIBReady"
+	VIBNotReady      = "VIBNotReady"
 )
 
 // Categories
@@ -122,6 +122,9 @@ func (r *Reconciler) validate(provider *api.Provider) error {
 
 	// Validate SMB CSI driver for HyperV providers
 	err = r.validateSMBCSI(provider)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
 	// Validate VIB readiness for vSphere providers when VIB method is enabled
 	err = r.validateVIBReadiness(provider, secret)
 	if err != nil {
@@ -984,6 +987,9 @@ func (r *Reconciler) validateSMBCSI(provider *api.Provider) error {
 
 	// SMB CSI driver is installed - remove any previous condition
 	provider.Status.DeleteCondition(SMBCSIDriverNotReady)
+	return nil
+}
+
 // validateVIBReadiness validates VIB readiness for migration plans using xcopy volume populators
 func (r *Reconciler) validateVIBReadiness(provider *api.Provider, secret *core.Secret) error {
 	r.Log.Info("VIB validation: starting validateVIBReadiness", "provider", provider.Name)
@@ -1006,8 +1012,17 @@ func (r *Reconciler) validateVIBReadiness(provider *api.Provider, secret *core.S
 		return nil
 	}
 
-	if vsphere_offload.ShouldSkipVIBCheck(provider.Annotations) {
-		r.Log.Info("VIB validation: skipping due to cache", "provider", provider.Name, "vib-last-check", provider.Annotations[vsphere_offload.VIBLastCheckAnnotation])
+	// Check if we should skip VIB validation based on the last check time
+	// Use either VIBReady or VIBNotReady condition's LastTransitionTime (whichever exists)
+	var lastCheckTime time.Time
+	if vibReadyCond := provider.Status.FindCondition(VIBReady); vibReadyCond != nil {
+		lastCheckTime = vibReadyCond.LastTransitionTime.Time
+	} else if vibNotReadyCond := provider.Status.FindCondition(VIBNotReady); vibNotReadyCond != nil {
+		lastCheckTime = vibNotReadyCond.LastTransitionTime.Time
+	}
+
+	if vsphere_offload.ShouldSkipVIBCheck(lastCheckTime) {
+		r.Log.Info("VIB validation: skipping due to cache", "provider", provider.Name, "vib-last-check", lastCheckTime)
 		provider.Status.StageCondition(VIBReady, VIBNotReady)
 		r.Log.Info("VIB validation: staged VIB conditions during cache skip", "provider", provider.Name)
 		return nil
@@ -1092,11 +1107,6 @@ func (r *Reconciler) validateVIBWithClient(provider *api.Provider, client vmware
 			failedHosts = append(failedHosts, itemStr)
 		}
 	}
-
-	if provider.Annotations == nil {
-		provider.Annotations = make(map[string]string)
-	}
-	provider.Annotations[vsphere_offload.VIBLastCheckAnnotation] = time.Now().Format(time.RFC3339)
 
 	if len(failedHosts) == 0 {
 		r.Log.Info("VIB validation: all hosts passed, removing VIB conditions", "provider", provider.Name)
