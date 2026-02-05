@@ -111,18 +111,20 @@ oc get migrations -n openshift-mtv | grep plan-1d50gb-10vm-1snap
 ### Test Migration
 Perform a small test migration with 1 VM with 1GB disk to validate the setup. Verify successful completion and data integrity
 
-### Observations
+### Test Environment
 
-Based on comprehensive testing executed via the MTV Migration Automation Tool, several key performance patterns and characteristics have been identified for PowerStore XCOPY migrations:
+Testing validated OCP MTV VM migrations using XCOPY with PowerStore VMFS datastore across various configurations:
 
-- **Performance Improvement**: XCOPY provides 95% faster migrations (1TB: 4.5h → 7m) compared to non-XCOPY cold migrations.
+- **Configurations**: 1-10 VMs with 1-10 disks of 50GB with 1-5 snapshots and 1-10 VMs with 1 disk of 1TB-2TB sizes
+- **'Maximum concurrent VM migrations' on MTV**: 1
+- **Warm migration**: Validated with minimal configurations (1 VM with 1 50GB disk)
+- **Performance**: XCOPY significantly faster than non-XCOPY migrations across all scenarios
 
-- **Snapshot Impact**: Snapshots increase migration time, with 5 snapshots taking 2.4× longer than no snapshots, though still 46% faster than non-XCOPY migrations (no snapshot: 3m 53s, 5 snapshots: 9m 11s, non-XCOPY: 16m 59s).
+#### Versions Used:
 
-- **Scaling Characteristics**: Multi-disk VMs show sub-linear scaling, with 10×50GB disks taking only 2.4× longer than a single 50GB disk (1 disk: 3m 53s, 10 disks: 9m 14s).
-
-- **Concurrency Benefits**: Increasing 'Maximum concurrent VM migrations' from 1 to 20 reduced total migration time by 40% (43m → 25m 55s) for 10 VMs (each with 50GB disk), demonstrating improved throughput with higher concurrency.
-
-- **Migration Types**: Warm migrations incur 40% longer total duration (8m 20s vs 5m 56s) due to pre-syncing phase overhead, despite reducing final cutover time for a VM (with 50GB disk).
-
-- **Large-Scale Performance**: 1TB disks complete in 7m 14s and 2TB disks in 16m 19s (cold migrations without snapshots), demonstrating enterprise scalability for large workloads.
+- RedHat OpenShift Container Platform: 4.19.21
+- Operators:
+  - Dell Container Storage Provider: 1.11.0
+  - OpenShift Virtualization: 4.19.15
+  - Migration Toolkit for Virtualization Operator: 2.10.4
+- PowerStore version: 4.4.0.0
